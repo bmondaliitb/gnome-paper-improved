@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+weight_file="${XDG_CONFIG_HOME:-$HOME/.config}/papers-bold/weight"
+if [[ -z "${PDF_FONT_WEIGHT:-}" ]]; then
+    PDF_FONT_WEIGHT=24
+    if [[ -f "$weight_file" ]]; then
+        PDF_FONT_WEIGHT=$(cat "$weight_file")
+    fi
+fi
+if [[ ! "$PDF_FONT_WEIGHT" =~ ^[0-9]{1,3}$ ]] || (( 10#$PDF_FONT_WEIGHT > 256 )); then
+    echo 'papers-bold: weight must be an integer from 0 to 256.' >&2
+    exit 1
+fi
+export PDF_FONT_WEIGHT=$((10#$PDF_FONT_WEIGHT))
+
+if [[ "${1:-}" == --debug ]]; then
+    export PDF_FONT_DEBUG=1
+    shift
+    echo "papers-bold: launching /usr/bin/papers with weight ${PDF_FONT_WEIGHT:-24}" >&2
+    if command -v pgrep >/dev/null && pgrep -x papers >/dev/null; then
+        echo 'papers-bold: Papers is already running. Close it first so it cannot reuse the old settings.' >&2
+        exit 1
+    fi
+fi
+
+shim="$HOME/.local/lib/papers-bold/ft-pdf-bold.so"
+if [[ ! -r "$shim" ]]; then
+    echo "papers-bold: missing shim: $shim; run install.sh first." >&2
+    exit 1
+fi
+
+export LD_PRELOAD="$shim"
+export FREETYPE_PROPERTIES="cff:no-stem-darkening=0 type1:no-stem-darkening=0 t1cid:no-stem-darkening=0 autofitter:no-stem-darkening=0"
+exec /usr/bin/papers "$@"
